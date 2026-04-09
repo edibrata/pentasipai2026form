@@ -350,7 +350,7 @@
 
                 <div class="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden relative">
                     <div class="overflow-auto max-h-[600px] custom-scrollbar text-center">
-                        <table class="w-full text-center border-collapse min-w-[1600px]" id="adminDataTable">
+                        <table class="w-full text-center border-collapse min-w-[1700px]" id="adminDataTable">
                             <thead class="sticky top-0 bg-slate-100 z-20 shadow-sm border-b border-slate-200 text-slate-800">
                                 <tr class="text-[9px] font-black text-slate-500 uppercase tracking-widest text-center">
                                     <th class="px-4 py-4 text-center w-12 bg-slate-100 sortable-header" onclick="toggleAdminSort('timestamp_raw')">No <span id="admin-icon-no" class="sort-icon"></span></th>
@@ -361,9 +361,8 @@
                                     <th class="px-4 py-4 sortable-header bg-slate-100 text-left" onclick="toggleAdminSort('nama_peserta')">Nama Peserta <span id="admin-icon-nama_peserta" class="sort-icon"></span></th>
                                     <th class="px-4 py-4 sortable-header bg-slate-100" onclick="toggleAdminSort('nisn')">NISN <span id="admin-icon-nisn" class="sort-icon"></span></th>
                                     <th class="px-4 py-4 text-center sortable-header bg-slate-100" onclick="toggleAdminSort('jk')">JK <span id="admin-icon-jk" class="sort-icon"></span></th>
-                                    <th class="px-4 py-4 sortable-header bg-slate-100 text-left" onclick="toggleAdminSort('tempat')">Tempat Lahir <span id="admin-icon-tempat" class="sort-icon"></span></th>
-                                    <th class="px-4 py-4 sortable-header bg-slate-100" onclick="toggleAdminSort('tgl')">Tgl Lahir <span id="admin-icon-tgl" class="sort-icon"></span></th>
-                                    <th class="px-4 py-4 text-center sortable-header bg-slate-100" onclick="toggleAdminSort('kelas')">Kelas <span id="admin-icon-kelas" class="sort-icon"></span></th>
+                                    <th class="px-4 py-4 text-center w-24 bg-slate-100">Token Revisi</th>
+                                    <th class="px-4 py-4 sortable-header bg-slate-100 text-center" onclick="toggleAdminSort('kelas')">Kelas <span id="admin-icon-kelas" class="sort-icon"></span></th>
                                     <th class="px-4 py-4 sortable-header bg-slate-100 text-left" onclick="toggleAdminSort('guru')">Pembimbing <span id="admin-icon-guru" class="sort-icon"></span></th>
                                     <th class="px-4 py-4 text-center w-28 bg-slate-100">Aksi</th>
                                 </tr>
@@ -375,6 +374,23 @@
             </div>
         </section>
     </main>
+
+    <!-- Modal Token Revisi -->
+    <div id="tokenModal" class="fixed inset-0 bg-black/70 z-[110] hidden flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl p-6 md:p-8 max-w-sm w-full shadow-2xl text-center transform scale-110 transition-all">
+            <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-black">🔑</div>
+            <h3 class="text-lg font-black uppercase text-slate-900 mb-1">Verifikasi Akses</h3>
+            <p class="text-[11px] font-medium text-slate-500 mb-6 uppercase tracking-wider">Masukkan kode token revisi untuk <br><span id="tokenTargetSchool" class="text-emerald-600 font-black">NAMA SEKOLAH</span></p>
+            
+            <input type="text" id="inputRevisionToken" class="w-full px-4 py-4 rounded-xl border-2 border-slate-100 bg-slate-50 focus:border-emerald-500 outline-none text-center font-black text-xl tracking-[0.5em] mb-4 uppercase" placeholder="------">
+            
+            <div class="flex flex-col gap-2">
+                <button onclick="verifyTokenAndProceed()" class="w-full bg-emerald-600 text-white font-black py-4 rounded-xl text-[10px] uppercase tracking-widest shadow-lg active:scale-95 transition-all">Buka Akses Revisi</button>
+                <button onclick="requestTokenWA()" class="w-full bg-white text-emerald-600 border border-emerald-100 font-black py-3 rounded-xl text-[10px] uppercase tracking-widest hover:bg-emerald-50 transition-all">Minta Kode Token</button>
+                <button onclick="document.getElementById('tokenModal').classList.add('hidden')" class="text-slate-400 font-bold text-[10px] uppercase mt-2 hover:text-rose-500">Batal</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="w-full border-t border-slate-200 mt-auto py-10 bg-white">
@@ -394,11 +410,13 @@
 
     <script>
         const DEADLINE_DATE = new Date("2026-04-29T20:00:00");
+        const ADMIN_WA = "087773949015";
         let currentStep = 1;
         let selectedLomba = [];
         let isRevisionMode = false;
         let currentEditId = null; 
         let tempFormData = {};
+        let pendingRevisionData = null;
         window.submissions = [];
         
         let schoolSortKey = 'timestamp_raw'; 
@@ -437,6 +455,14 @@
             mhq: { name: "MUSABAQOH HIFDZIL QUR’AN (MHQ)", count: 1 },
             pildacil: { name: "PEMILIHAN DA'I CILIK (PILDACIL)", count: 1 }
         };
+
+        function generateToken() {
+            const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; 
+            let res = "";
+            for (let i = 0; i < 6; i++) 
+                res += chars.charAt(Math.floor(chars.length * Math.random()));
+            return res;
+        }
 
         function initUI() {
             const statsGrid = document.getElementById('statsGrid');
@@ -485,6 +511,17 @@
             box.classList.remove('hidden');
             numEl.innerText = num;
             textEl.innerHTML = `Telah dilakukan undian nomor peserta pada forum rapat kepala sekolah pada Senin, 6 April 2026. Berdasarkan hasil undian <strong class="text-emerald-700 uppercase tracking-tight">${school}</strong> mendapatkan nomor undian <strong class="text-amber-600 text-lg mx-1">${num}</strong>.`;
+
+            // Auto-select checkboxes in Revision Mode
+            if (isRevisionMode) {
+                const match = window.submissions.find(s => s.nama_sekolah === school);
+                if (match) {
+                    const boxes = document.querySelectorAll('input[name="lomba_pilihan"]');
+                    boxes.forEach(box => {
+                        box.checked = !!match[`${box.value}_nama_1`];
+                    });
+                }
+            }
         }
 
         function updateDeadlineUI() {
@@ -509,7 +546,7 @@
 
         window.switchRevisionMode = function(toRevision, targetSchool = "") {
             isRevisionMode = toRevision;
-            if (!isRevisionMode) currentEditId = null; 
+            if (!isRevisionMode) { currentEditId = null; pendingRevisionData = null; tempFormData = {}; }
             const label = document.getElementById('dropdownLabel'), hint = document.getElementById('selectionHint'), link = document.getElementById('revLink'), cancel = document.getElementById('cancelRevLink'), dropdown = document.getElementById('main_sekolah');
             if (label) label.innerText = isRevisionMode ? "Pilih Nama Sekolah (Mode Revisi)" : "Pilih Nama Sekolah";
             if (hint) hint.classList.toggle('hidden', !isRevisionMode);
@@ -612,6 +649,23 @@
             showModal("MODE EDIT", `Mengedit data ${entry.nama_sekolah} untuk cabang ${LOMBA_MAP[branchKey].name}.`, "success");
         }
 
+        window.copyToken = function(text) {
+            const dummy = document.createElement("textarea");
+            document.body.appendChild(dummy);
+            dummy.value = text;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+            showModal("BERHASIL", "Token disalin ke clipboard.", "success");
+        }
+
+        window.sendTokenWA = function(phone, school, token) {
+            const cleanPhone = phone.replace(/[^0-9]/g, '');
+            const finalPhone = cleanPhone.startsWith('0') ? '62' + cleanPhone.substring(1) : cleanPhone;
+            const message = `Halo Bapak/Ibu Pembimbing Pentas PAI ${school},\n\nBerikut adalah KODE TOKEN REVISI untuk pendaftaran sekolah Anda:\n\n*${token}*\n\nSilakan gunakan kode tersebut di portal pendaftaran pada menu REVISI. Terima kasih.`;
+            window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(message)}`, '_blank');
+        }
+
         window.updateAdminTable = function() {
             const tbody = document.getElementById('tableBody'); if (!tbody) return;
             const filterVal = document.getElementById('adminFilter').value, searchVal = document.getElementById('adminSearch').value.toLowerCase().trim();
@@ -622,10 +676,11 @@
                         if (filterVal !== 'all' && filterVal !== key) return;
                         for(let i=1; i<=LOMBA_MAP[key].count; i++) {
                             const name = sub[`${key}_nama_${i}`] || "", sekolah = sub.nama_sekolah || "", nisn = sub[`${key}_nisn_${i}`] || "", guru = sub[`${key}_guru_nama`] || "", wa = sub[`${key}_guru_wa`] || "", tempat = sub[`${key}_tempat_${i}`] || "", lomba = LOMBA_MAP[key].name, undian = DAFTAR_UNDIAN[sekolah] || "-";
-                            if (searchVal) { const searchableContent = [sekolah, lomba, name, nisn, guru, wa, tempat, `Kelas ${sub[`${key}_kelas_${i}`]}`, sub[`${key}_jk_${i}`]].join(' ').toLowerCase(); if (!searchableContent.includes(searchVal)) continue; }
+                            const token = sub.revision_token || "DATA LAMA";
+                            if (searchVal) { const searchableContent = [sekolah, lomba, name, nisn, guru, wa, tempat, token, `Kelas ${sub[`${key}_kelas_${i}`]}`, sub[`${key}_jk_${i}`]].join(' ').toLowerCase(); if (!searchableContent.includes(searchVal)) continue; }
                             const parts = (sub.waktu_simpan || "").split(/[/, .:]+/).filter(x => x), rawTime = parts.length >= 5 ? new Date(parts[2], parts[1] - 1, parts[0], parts[3], parts[4], parts[5] || 0).getTime() : 0;
                             const formattedTime = parts.length >= 5 ? `${parts[2]}/${parts[1].padStart(2,'0')}/${parts[0].padStart(2,'0')} ${parts[3].padStart(2,'0')}.${parts[4].padStart(2,'0')}.${parts[5] || '00'}` : "-";
-                            rawRows.push({ id: sub.id, timestamp_raw: rawTime, waktu_daftar: formattedTime, nama_sekolah: sekolah, undian: undian, lomba_id: key, lomba_name: lomba, nama_peserta: name, nisn: nisn, jk: sub[`${key}_jk_${i}`] || "-", tempat: tempat, tgl: sub[`${key}_tgl_${i}`] || "-", kelas: sub[`${key}_kelas_${i}`] || "-", guru: guru, wa: wa });
+                            rawRows.push({ id: sub.id, timestamp_raw: rawTime, waktu_daftar: formattedTime, nama_sekolah: sekolah, undian: undian, lomba_id: key, lomba_name: lomba, nama_peserta: name, nisn: nisn, jk: sub[`${key}_jk_${i}`] || "-", tempat: tempat, tgl: sub[`${key}_tgl_${i}`] || "-", kelas: sub[`${key}_kelas_${i}`] || "-", guru: guru, wa: wa, revision_token: token });
                         }
                     }
                 });
@@ -633,7 +688,7 @@
             rawRows.sort((a, b) => { let valA = a[adminSortKey], valB = b[adminSortKey]; if (adminSortKey === 'kelas') return adminSortDir === 'asc' ? parseInt(valA) - parseInt(valB) : parseInt(valB) - parseInt(valA); if (typeof valA === 'string') return adminSortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA); return adminSortDir === 'asc' ? valA - valB : valB - valA; });
             ['timestamp_raw', 'nama_sekolah', 'lomba_name', 'nama_peserta', 'nisn', 'jk', 'tempat', 'tgl', 'kelas', 'guru'].forEach(k => { const icon = document.getElementById(k === 'timestamp_raw' ? 'admin-icon-timestamp_raw' : `admin-icon-${k}`); if(icon) icon.innerHTML = '▴▾'; const activeIconId = adminSortKey === 'timestamp_raw' ? (k === 'timestamp_raw' ? 'admin-icon-timestamp_raw' : 'admin-icon-no') : `admin-icon-${adminSortKey}`, activeIcon = document.getElementById(activeIconId); if(activeIcon) { activeIcon.innerHTML = adminSortDir === 'asc' ? '▴' : '▾'; } });
             if (rawRows.length === 0) { tbody.innerHTML = '<tr><td colspan="13" class="p-12 text-center font-bold text-slate-400 uppercase text-xs">Pencarian tidak ditemukan.</td></tr>'; return; }
-            tbody.innerHTML = rawRows.map((r, idx) => `<tr class="hover:bg-emerald-50/30 transition-colors border-b border-slate-50 text-[11px] text-slate-700 text-center"><td class="px-4 py-3 text-center text-slate-400 font-bold">${idx + 1}</td><td class="px-4 py-3 font-mono text-emerald-600 font-bold whitespace-nowrap text-center text-[10px]">${r.waktu_daftar}</td><td class="px-4 py-3 font-bold uppercase truncate max-w-[150px] text-left">${r.nama_sekolah}</td><td class="px-4 py-3 text-center"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black text-[10px]">${r.undian}</span></td><td class="px-4 py-3 text-left text-[10px]"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-black border border-emerald-100 uppercase text-center">${r.lomba_name}</span></td><td class="px-4 py-3 font-black uppercase text-slate-900 text-left">${r.nama_peserta}</td><td class="px-4 py-3 font-mono text-slate-500 font-bold text-[10px] text-center">${r.nisn}</td><td class="px-4 py-3 text-center text-[10px]">${r.jk === 'Laki-Laki' ? 'L' : 'P'}</td><td class="px-4 py-3 uppercase text-[10px] text-left">${r.tempat}</td><td class="px-4 py-3 text-[10px] font-bold text-slate-800 text-center">${r.tgl}</td><td class="px-4 py-3 text-center font-black">${r.kelas}</td><td class="px-4 py-3 text-left"><div class="font-bold text-[10px] uppercase truncate max-w-[120px]">${r.guru}</div><div class="text-emerald-500 text-[9px] font-black">${r.wa}</div></td><td class="px-4 py-3 text-center shrink-0"><div class="flex items-center justify-center gap-1.5"><button onclick="editEntry('${r.id}', '${r.lomba_id}')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button><button onclick="deleteEntry('${r.id}', '${r.lomba_id}')" class="p-1.5 bg-rose-50 text-rose-600 rounded hover:bg-rose-600 hover:text-white transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div></td></tr>`).join('');
+            tbody.innerHTML = rawRows.map((r, idx) => `<tr class="hover:bg-emerald-50/30 transition-colors border-b border-slate-50 text-[11px] text-slate-700 text-center"><td class="px-4 py-3 text-center text-slate-400 font-bold">${idx + 1}</td><td class="px-4 py-3 font-mono text-emerald-600 font-bold whitespace-nowrap text-center text-[10px]">${r.waktu_daftar}</td><td class="px-4 py-3 font-bold uppercase truncate max-w-[150px] text-left">${r.nama_sekolah}</td><td class="px-4 py-3 text-center"><span class="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-black text-[10px]">${r.undian}</span></td><td class="px-4 py-3 text-left text-[10px]"><span class="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded text-[9px] font-black border border-emerald-100 uppercase text-center">${r.lomba_name}</span></td><td class="px-4 py-3 font-black uppercase text-slate-900 text-left">${r.nama_peserta}</td><td class="px-4 py-3 font-mono text-slate-500 font-bold text-[10px] text-center">${r.nisn}</td><td class="px-4 py-3 text-center text-[10px]">${r.jk === 'Laki-Laki' ? 'L' : 'P'}</td><td class="px-4 py-3 text-center"><div class="flex items-center justify-center gap-1"><span class="font-black text-slate-900 font-mono tracking-tighter ${r.revision_token === 'DATA LAMA' ? 'text-rose-500 opacity-50' : ''}">${r.revision_token}</span><button onclick="copyToken('${r.revision_token}')" class="text-slate-300 hover:text-emerald-500 ${r.revision_token === 'DATA LAMA' ? 'hidden' : ''}" title="Salin Token">📋</button><button onclick="sendTokenWA('${r.wa}','${r.nama_sekolah}','${r.revision_token}')" class="text-emerald-400 hover:text-emerald-600 ${r.revision_token === 'DATA LAMA' ? 'hidden' : ''}" title="Kirim WA">💬</button></div></td><td class="px-4 py-3 text-center font-black">${r.kelas}</td><td class="px-4 py-3 text-left"><div class="font-bold text-[10px] uppercase truncate max-w-[120px]">${r.guru}</div><div class="text-emerald-500 text-[9px] font-black">${r.wa}</div></td><td class="px-4 py-3 text-center shrink-0"><div class="flex items-center justify-center gap-1.5"><button onclick="editEntry('${r.id}', '${r.lomba_id}')" class="p-1.5 bg-emerald-50 text-emerald-600 rounded hover:bg-emerald-600 hover:text-white transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button><button onclick="deleteEntry('${r.id}', '${r.lomba_id}')" class="p-1.5 bg-rose-50 text-rose-600 rounded hover:bg-rose-600 hover:text-white transition-all shadow-sm"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div></td></tr>`).join('');
         }
 
         window.exportToExcel = function() {
@@ -644,7 +699,7 @@
                 Object.keys(LOMBA_MAP).forEach(key => {
                     if (sub[`${key}_nama_1`]) {
                         for(let i=1; i<=LOMBA_MAP[key].count; i++) {
-                            overallData.push({ "Waktu Simpan": sub.waktu_simpan, "Sekolah": school, "No Undian": undian, "Cabang Lomba": LOMBA_MAP[key].name, "Nama Peserta": sub[`${key}_nama_${i}`] || '', "NISN": sub[`${key}_nisn_${i}`] || '', "JK": sub[`${key}_jk_${i}`] || '', "Tempat Lahir": sub[`${key}_tempat_${i}`] || '', "Tgl Lahir": sub[`${key}_tgl_${i}`] || '', "Kelas": sub[`${key}_kelas_${i}`] || '', "Nama Pembimbing": sub[`${key}_guru_nama`] || '', "No WA Pembimbing": sub[`${key}_guru_wa`] || '' });
+                            overallData.push({ "Waktu Simpan": sub.waktu_simpan, "Sekolah": school, "No Undian": undian, "Cabang Lomba": LOMBA_MAP[key].name, "Token Revisi": sub.revision_token || 'DATA LAMA', "Nama Peserta": sub[`${key}_nama_${i}`] || '', "NISN": sub[`${key}_nisn_${i}`] || '', "JK": sub[`${key}_jk_${i}`] || '', "Tempat Lahir": sub[`${key}_tempat_${i}`] || '', "Tgl Lahir": sub[`${key}_tgl_${i}`] || '', "Kelas": sub[`${key}_kelas_${i}`] || '', "Nama Pembimbing": sub[`${key}_guru_nama`] || '', "No WA Pembimbing": sub[`${key}_guru_wa`] || '' });
                         }
                     }
                 });
@@ -654,7 +709,7 @@
                 const branchData = [];
                 window.submissions.forEach(sub => {
                     if (sub[`${key}_nama_1`]) {
-                        for(let i=1; i<=info.count; i++) { branchData.push({ "No Undian": DAFTAR_UNDIAN[sub.nama_sekolah] || "-", "Sekolah": sub.nama_sekolah, "Nama Peserta": sub[`${key}_nama_${i}`] || '', "NISN": sub[`${key}_nisn_${i}`] || '', "JK": sub[`${key}_jk_${i}`] || '', "Tempat Lahir": sub[`${key}_tempat_${i}`] || '', "Tgl Lahir": sub[`${key}_tgl_${i}`] || '', "Kelas": sub[`${key}_kelas_${i}`] || '', "Nama Pembimbing": sub[`${key}_guru_nama`] || '', "No WA Pembimbing": sub[`${key}_guru_wa`] || '', "Waktu Simpan": sub.waktu_simpan }); }
+                        for(let i=1; i<=info.count; i++) { branchData.push({ "No Undian": DAFTAR_UNDIAN[sub.nama_sekolah] || "-", "Sekolah": sub.nama_sekolah, "Nama Peserta": sub[`${key}_nama_${i}`] || '', "NISN": sub[`${key}_nisn_${i}`] || '', "JK": sub[`${key}_jk_${i}`] || '', "Tempat Lahir": sub[`${key}_tempat_${i}`] || '', "Tgl Lahir": sub[`${key}_tgl_${i}`] || '', "Kelas": sub[`${key}_kelas_${i}`] || '', "Nama Pembimbing": sub[`${key}_guru_nama`] || '', "No WA Pembimbing": sub[`${key}_guru_wa`] || '', "Token": sub.revision_token || 'DATA LAMA', "Waktu Simpan": sub.waktu_simpan }); }
                     }
                 });
                 if (branchData.length > 0) { const sheetName = info.name.split('(')[0].trim().substring(0, 31); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(branchData), sheetName); }
@@ -669,6 +724,7 @@
             const schoolName = data.nama_sekolah;
             const undian = DAFTAR_UNDIAN[schoolName] || "-";
             const timestamp = data.waktu_simpan;
+            const token = data.revision_token || "DATA LAMA";
             
             let rows = "";
             let idx = 1;
@@ -687,10 +743,8 @@
 
             const titleText = isRevision ? "BUKTI REVISI PENDAFTARAN PENTAS PAI 2026" : "KARTU BUKTI PENDAFTARAN PENTAS PAI 2026";
 
-            // CSS Reset untuk PDF
             temp.innerHTML = `
                 <div id="pdfContent" style="width: 760px; padding: 30px; color: #1e293b; font-family: 'Plus Jakarta Sans', Arial, sans-serif; position: relative; background: white; box-sizing: border-box; margin: 0 auto; min-height: 1000px;">
-                    <!-- HEADER -->
                     <div style="text-align: center; margin-bottom: 5px;">
                         <h2 style="margin: 0; color: #4f46e5; text-transform: uppercase; font-size: 22px; font-weight: 800; letter-spacing: 0.5px;">${titleText}</h2>
                         <p style="margin: 5px 0 0 0; font-size: 13px; font-weight: 600; color: #64748b;">KECAMATAN SUKARESMI, KABUPATEN PANDEGLANG</p>
@@ -698,7 +752,6 @@
                     
                     <div style="border-bottom: 1px solid #e2e8f0; margin: 20px 0 25px 0;"></div>
 
-                    <!-- IDENTITAS -->
                     <div style="position: relative; margin-bottom: 30px; min-height: 140px;">
                         <h4 style="margin: 0 0 15px 0; font-size: 13px; text-transform: uppercase; font-weight: 800; color: #059669; letter-spacing: 1px;">IDENTITAS PENDAFTAR</h4>
                         
@@ -710,12 +763,12 @@
                         <table style="width: 100%; font-size: 14px; border-collapse: collapse; border: none;">
                             <tr><td style="width: 130px; padding: 6px 0; font-weight: 600;">Nama Sekolah</td><td style="padding: 6px 0;">: <span style="font-weight: 700; text-transform: uppercase;">${schoolName}</span></td></tr>
                             <tr><td style="padding: 6px 0; font-weight: 600;">Nomor Undian</td><td style="padding: 6px 0;">: <span style="font-weight: 700;">${undian}</span></td></tr>
+                            <tr><td style="padding: 6px 0; font-weight: 600;">Token Revisi</td><td style="padding: 6px 0;">: <span style="font-weight: 900; color: #059669; font-family: monospace; font-size: 18px;">${token}</span></td></tr>
                             <tr><td style="padding: 6px 0; font-weight: 600;">Waktu Simpan</td><td style="padding: 6px 0;">: ${timestamp}</td></tr>
                             <tr><td style="padding: 6px 0; font-weight: 600;">ID Registrasi</td><td style="padding: 6px 0;">: <span style="font-family: monospace; font-weight: 700; color: #475569;">${docId}</span></td></tr>
                         </table>
                     </div>
 
-                    <!-- TABEL RINCIAN -->
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px; border: 1px solid #cbd5e1; table-layout: fixed;">
                         <thead style="background: #4f46e5; color: white;">
                             <tr>
@@ -732,13 +785,11 @@
                         </tbody>
                     </table>
 
-                    <!-- FOOTER -->
                     <div style="margin-top: 60px; font-size: 13px; line-height: 1.6; text-align: center;">
                         <p style="margin: 0; font-weight: 600;">Dokumen ini adalah bukti sah ${isRevision ? 'revisi ' : ''}pendaftaran Pentas PAI Sukaresmi 2026.</p>
-                        <p style="margin: 0; color: #64748b; font-size: 11px;">Dicetak secara otomatis oleh sistem pendaftaran online pada ${new Date().toLocaleString('id-ID')}.</p>
+                        <p style="margin: 0; color: #64748b; font-size: 11px;">Simpan Token Revisi Anda untuk merubah data di kemudian hari. Dicetak otomatis pada ${new Date().toLocaleString('id-ID')}.</p>
                     </div>
 
-                    <!-- Watermark -->
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); opacity: 0.04; font-size: 120px; font-weight: 900; color: #4f46e5; white-space: nowrap; pointer-events: none; z-index: -1;">VERIFIED SYSTEM</div>
                 </div>`;
 
@@ -746,14 +797,7 @@
                 margin: 0, 
                 filename: `Bukti_${isRevision ? 'Revisi_' : ''}PAI_${schoolName.replace(/ /g, '_')}.pdf`,
                 image: { type: 'jpeg', quality: 1.0 }, 
-                html2canvas: { 
-                    scale: 4, 
-                    useCORS: true, 
-                    logging: false, 
-                    letterRendering: true,
-                    width: 760,
-                    backgroundColor: '#ffffff'
-                }, 
+                html2canvas: { scale: 4, useCORS: true, logging: false, letterRendering: true, width: 760, backgroundColor: '#ffffff' }, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
             };
             
@@ -777,6 +821,7 @@
                     await window.firestoreTools.updateDoc(docRef, tempFormData);
                     showModal("BERHASIL REVISI", "Data pendaftaran berhasil diperbarui. Bukti PDF otomatis terunduh.", "success");
                 } else {
+                    tempFormData.revision_token = generateToken();
                     const docRef = await window.firestoreTools.addDoc(window.firestoreTools.collection(window.db, 'artifacts', window.customAppId, 'public', 'data', 'pendaftar'), tempFormData);
                     docId = docRef.id;
                     showModal("BERHASIL", "Pendaftaran berhasil disimpan. Bukti PDF otomatis terunduh.", "success");
@@ -786,7 +831,7 @@
                 setTimeout(() => generatePDF(pdfData, docId, isRevision), 1500);
                 
                 document.getElementById('multiStepForm').reset();
-                tempFormData = {}; currentStep = 1; selectedLomba = []; currentEditId = null;
+                tempFormData = {}; currentStep = 1; selectedLomba = []; currentEditId = null; pendingRevisionData = null;
                 const dynamicStepsContainer = document.getElementById('dynamicStepsContainer');
                 if(dynamicStepsContainer) dynamicStepsContainer.innerHTML = '';
                 document.querySelectorAll('.step-content').forEach(s => s.classList.remove('active'));
@@ -815,7 +860,28 @@
             if (tabId === 'data' && !document.getElementById('adminPanel').classList.contains('hidden')) updateAdminTable();
         }
 
-        function captureCurrentFormData() { const form = document.getElementById('multiStepForm'); if (form) Object.assign(tempFormData, Object.fromEntries(new FormData(form).entries())); }
+        function captureCurrentFormData() { 
+            const activeStep = document.querySelector('.step-content.active');
+            if (!activeStep) return;
+            
+            // Capture inputs from current step only to avoid overwriting memory with empty strings from hidden steps
+            const inputs = activeStep.querySelectorAll('input, select');
+            inputs.forEach(input => {
+                if (input.name) {
+                    if (input.type === 'checkbox') {
+                        // Keep lomba_pilihan logic separate as it's used for flow
+                    } else {
+                        tempFormData[input.name] = input.value;
+                    }
+                }
+            });
+            
+            // Special handling for Step 1
+            if (currentStep === 1) {
+                const schoolSelect = document.getElementById('main_sekolah');
+                if (schoolSelect) tempFormData.nama_sekolah = schoolSelect.value;
+            }
+        }
 
         function moveStep(delta) {
             captureCurrentFormData();
@@ -823,13 +889,21 @@
                 const school = document.getElementById('main_sekolah').value;
                 const checks = document.querySelectorAll('input[name="lomba_pilihan"]:checked');
                 if (!school || checks.length === 0) { showModal("DATA BELUM LENGKAP", "Pilih nama sekolah dan tandai minimal satu lomba.", "error"); return; }
-                selectedLomba = Array.from(checks).map(c => c.value);
+                
                 if (isRevisionMode && !currentEditId) {
                     const existing = window.submissions.find(s => s.nama_sekolah === school);
-                    if (existing) { currentEditId = existing.id; tempFormData = { ...existing, ...tempFormData }; }
+                    if (existing) {
+                        pendingRevisionData = existing;
+                        document.getElementById('tokenTargetSchool').innerText = school;
+                        document.getElementById('inputRevisionToken').value = "";
+                        document.getElementById('tokenModal').classList.remove('hidden');
+                        return; 
+                    }
                 }
+                selectedLomba = Array.from(checks).map(c => c.value);
                 generateParticipantForms(); 
             }
+            
             const total = 1 + selectedLomba.length;
             if (delta === 1) {
                 const el = document.getElementById(`step-${currentStep}`);
@@ -847,6 +921,46 @@
             document.getElementById('prevBtn').style.visibility = currentStep > 1 ? 'visible' : 'hidden';
             document.getElementById('nextBtn').innerText = currentStep === total ? 'SIMPAN PENDAFTARAN' : 'SELANJUTNYA';
             updateStepperUI(); window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        window.verifyTokenAndProceed = function() {
+            const input = document.getElementById('inputRevisionToken').value.trim().toUpperCase();
+            if (!input) return;
+            const correctToken = (pendingRevisionData.revision_token || "").toUpperCase();
+            
+            // Logika Fallback: Jika data lama (token kosong), izinkan akses dengan kata 'ADMIN'
+            if (input === correctToken || (correctToken === "" && input === "ADMIN")) {
+                currentEditId = pendingRevisionData.id;
+                tempFormData = {...pendingRevisionData};
+                delete tempFormData.id;
+                
+                // Pre-check checkboxes based on stored data
+                const checks = document.querySelectorAll('input[name="lomba_pilihan"]');
+                checks.forEach(c => {
+                    c.checked = !!tempFormData[`${c.value}_nama_1`];
+                });
+                
+                selectedLomba = Array.from(document.querySelectorAll('input[name="lomba_pilihan"]:checked')).map(c => c.value);
+                generateParticipantForms(); // Regenerate forms using the loaded tempFormData
+                
+                document.getElementById('tokenModal').classList.add('hidden');
+                
+                document.getElementById(`step-1`).classList.remove('active');
+                currentStep = 2;
+                document.getElementById(`step-2`).classList.add('active');
+                document.getElementById('prevBtn').style.visibility = 'visible';
+                const total = 1 + selectedLomba.length;
+                document.getElementById('nextBtn').innerText = currentStep === total ? 'SIMPAN PENDAFTARAN' : 'SELANJUTNYA';
+                updateStepperUI(); window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                showModal("TOKEN SALAH", "Kode token tidak valid. Hubungi admin untuk mendapatkan kode token sekolah Anda.", "error");
+            }
+        }
+
+        window.requestTokenWA = function() {
+            const school = document.getElementById('tokenTargetSchool').innerText;
+            const message = `Mohon dikirim kode token revisi data pendaftaran Pentas PAI ${school}.\n\nTerima Kasih.`;
+            window.open(`https://wa.me/${62 + ADMIN_WA.substring(1)}?text=${encodeURIComponent(message)}`, '_blank');
         }
 
         function checkAdmin() {
