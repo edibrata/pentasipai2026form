@@ -464,6 +464,16 @@
             return res;
         }
 
+        function getFormattedTimestamp() {
+            const now = new Date();
+            const YYYY = now.getFullYear();
+            const MM = String(now.getMonth() + 1).padStart(2, '0');
+            const DD = String(now.getDate()).padStart(2, '0');
+            const HH = String(now.getHours()).padStart(2, '0');
+            const SS = String(now.getSeconds()).padStart(2, '0');
+            return `${YYYY}${MM}${DD} ${HH}.${SS}`;
+        }
+
         function initUI() {
             const statsGrid = document.getElementById('statsGrid');
             if(statsGrid) {
@@ -512,7 +522,6 @@
             numEl.innerText = num;
             textEl.innerHTML = `Telah dilakukan undian nomor peserta pada forum rapat kepala sekolah pada Senin, 6 April 2026. Berdasarkan hasil undian <strong class="text-emerald-700 uppercase tracking-tight">${school}</strong> mendapatkan nomor undian <strong class="text-amber-600 text-lg mx-1">${num}</strong>.`;
 
-            // Auto-select checkboxes in Revision Mode
             if (isRevisionMode) {
                 const match = window.submissions.find(s => s.nama_sekolah === school);
                 if (match) {
@@ -535,7 +544,7 @@
             if (diff > 0) {
                 const days = Math.floor(diff / (1000 * 60 * 60 * 24)), hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)), minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)), seconds = Math.floor((diff % (1000 * 60)) / 1000);
                 banner.className = "block transition-all mb-3 text-emerald-600 text-center md:text-left";
-                deadlineText.innerHTML = `<div class="leading-none mb-1.5 opacity-80 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">PENDAFTARAN DITUTUP DALAM:</div><div class="leading-none text-[16px] md:text----------[22px] font-black text-emerald-700 tracking-tighter">${days} <span class="text-[10px] md:text-[12px] opacity-60 mr-1.5">HARI</span> ${hours} <span class="text-[10px] md:text-[12px] opacity-60 mr-1.5">JAM</span> ${minutes} <span class="text-[10px] md:text-[12px] opacity-60 mr-1.5">MENIT</span> ${seconds} <span class="text-[10px] md:text-[12px] opacity-60">DETIK</span></div>`;
+                deadlineText.innerHTML = `<div class="leading-none mb-1.5 opacity-80 font-bold uppercase tracking-widest text-[9px] md:text-[10px]">PENDAFTARAN DITUTUP DALAM:</div><div class="leading-none text-[16px] md:text-[22px] font-black text-emerald-700 tracking-tighter">${days} <span class="text-[10px] md:text-[12px] opacity-60 mr-1.5">HARI</span> ${hours} <span class="text-[10px] md:text-[12px] opacity-60 mr-1.5">JAM</span> ${minutes} <span class="text-[10px] md:text-[12px] opacity-60 mr-1.5">MENIT</span> ${seconds} <span class="text-[10px] md:text-[12px] opacity-60">DETIK</span></div>`;
                 if (heroBtn) { heroBtn.innerText = "DAFTAR SEKARANG"; heroBtn.className = "gradient-bg text-white px-10 py-3.5 rounded font-bold shadow-md active:scale-95 text-sm uppercase tracking-widest transition-all text-center"; }
             } else {
                 banner.className = "block transition-all mb-3 text-rose-600 text-center md:text-left";
@@ -699,7 +708,6 @@
                             const waTemplate = `Halo, saya Admin Pentas PAI, terkait ${sekolah}, kami sampaikan ...`;
                             const waLink = `https://wa.me/${finalWa}?text=${encodeURIComponent(waTemplate)}`;
 
-                            // Format display WA agar rapi (tambah 0 jika cuma mulai 8)
                             const displayWa = wa.startsWith('8') ? '0' + wa : wa;
 
                             rawRows.push({ id: sub.id, timestamp_raw: rawTime, waktu_daftar: formattedTime, nama_sekolah: sekolah, undian: undian, lomba_id: key, lomba_name: lomba, nama_peserta: name, nisn: nisn, jk: sub[`${key}_jk_${i}`] || "-", tempat: tempat, tgl: sub[`${key}_tgl_${i}`] || "-", kelas: sub[`${key}_kelas_${i}`] || "-", guru: guru, wa: displayWa, waLink: waLink, revision_token: token });
@@ -736,8 +744,9 @@
                 });
                 if (branchData.length > 0) { const sheetName = info.name.split('(')[0].trim().substring(0, 31); XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(branchData), sheetName); }
             });
-            const now = new Date(), timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}.${String(now.getSeconds()).padStart(2,'0')}`;
-            XLSX.writeFile(wb, `Edi Brata Peserta Pentas PAI Sukaresmi ${timestamp}.xlsx`);
+            
+            const timestampStr = getFormattedTimestamp();
+            XLSX.writeFile(wb, `Edi Brata Data Pendaftaran Pentas PAI ${timestampStr}.xlsx`);
         }
 
         async function generatePDF(data, docId = "", isRevision = false) {
@@ -815,9 +824,13 @@
                     <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); opacity: 0.04; font-size: 120px; font-weight: 900; color: #4f46e5; white-space: nowrap; pointer-events: none; z-index: -1;">VERIFIED SYSTEM</div>
                 </div>`;
 
+            const timestampStr = getFormattedTimestamp();
+            const typeText = isRevision ? "Bukti Revisi Pendaftaran" : "Bukti Pendaftaran";
+            const fileName = `Edi Brata ${typeText} Pentas PAI ${schoolName} ${timestampStr}.pdf`;
+
             const opt = { 
                 margin: 0, 
-                filename: `Bukti_${isRevision ? 'Revisi_' : ''}PAI_${schoolName.replace(/ /g, '_')}.pdf`,
+                filename: fileName,
                 image: { type: 'jpeg', quality: 1.0 }, 
                 html2canvas: { scale: 4, useCORS: true, logging: false, letterRendering: true, width: 760, backgroundColor: '#ffffff' }, 
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
@@ -886,19 +899,16 @@
             const activeStep = document.querySelector('.step-content.active');
             if (!activeStep) return;
             
-            // Capture inputs from current step only to avoid overwriting memory with empty strings from hidden steps
             const inputs = activeStep.querySelectorAll('input, select');
             inputs.forEach(input => {
                 if (input.name) {
                     if (input.type === 'checkbox') {
-                        // Keep lomba_pilihan logic separate as it's used for flow
                     } else {
                         tempFormData[input.name] = input.value;
                     }
                 }
             });
             
-            // Special handling for Step 1
             if (currentStep === 1) {
                 const schoolSelect = document.getElementById('main_sekolah');
                 if (schoolSelect) tempFormData.nama_sekolah = schoolSelect.value;
@@ -950,20 +960,18 @@
             if (!input) return;
             const correctToken = (pendingRevisionData.revision_token || "").toUpperCase();
             
-            // Logika Fallback: Jika data lama (token kosong), izinkan akses dengan kata 'ADMIN'
             if (input === correctToken || (correctToken === "" && input === "ADMIN")) {
                 currentEditId = pendingRevisionData.id;
                 tempFormData = {...pendingRevisionData};
                 delete tempFormData.id;
                 
-                // Pre-check checkboxes based on stored data
                 const checks = document.querySelectorAll('input[name="lomba_pilihan"]');
                 checks.forEach(c => {
                     c.checked = !!tempFormData[`${c.value}_nama_1`];
                 });
                 
                 selectedLomba = Array.from(document.querySelectorAll('input[name="lomba_pilihan"]:checked')).map(c => c.value);
-                generateParticipantForms(); // Regenerate forms using the loaded tempFormData
+                generateParticipantForms(); 
                 
                 document.getElementById('tokenModal').classList.add('hidden');
                 
